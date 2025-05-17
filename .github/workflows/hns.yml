@@ -22,4 +22,4 @@ jobs:
     - name: Get code coverage
       run: cargo install cargo-tarpaulin && cargo tarpaulin
     - name: Run `help` command for sanity
-      run: cargo run --verbose -- help
+      run: cargo run --verbose -- --help

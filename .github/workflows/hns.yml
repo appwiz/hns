@@ -70,9 +70,11 @@ jobs:
     
     - name: Install zip (Windows only)
       if: runner.os == 'Windows'
+      shell: powershell
       run: |
         choco install zip -y
-        refreshenv
+        Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
+        Refresh-Env
 
     - name: Build release binary
       run: cargo build --release --locked --target ${{ matrix.target }}

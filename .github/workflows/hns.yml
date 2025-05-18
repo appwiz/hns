@@ -1,20 +1,27 @@
-name: Build hns
+name: Build and Release hns
 on:
   schedule:
     - cron:  '20 14 * * 4'
   push:
     branches: [ "main" ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ "main" ]
     
 env:
   CARGO_TERM_COLOR: always
+  CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+  BINARY_NAME: hns
 
 jobs:
-  build:
-
+  test:
+    name: Test
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
     - name: Build
       run: cargo build --verbose
     - name: Run tests
@@ -23,3 +30,184 @@ jobs:
       run: cargo install cargo-tarpaulin && cargo tarpaulin
     - name: Run `help` command for sanity
       run: cargo run --verbose -- --help
+  
+  build:
+    name: Build ${{ matrix.target }}
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            name: hns-linux-amd64
+            asset_name: hns-linux-amd64.tar.gz
+            compress: tar -czf
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            name: hns-darwin-amd64
+            asset_name: hns-darwin-amd64.tar.gz
+            compress: tar -czf
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            name: hns-darwin-arm64
+            asset_name: hns-darwin-arm64.tar.gz
+            compress: tar -czf
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            name: hns-windows-amd64
+            asset_name: hns-windows-amd64.zip
+            compress: zip -j
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+    
+    - name: Build release binary
+      run: cargo build --release --locked --target ${{ matrix.target }}
+    
+    - name: Create artifact directory
+      run: mkdir artifacts
+    
+    - name: Copy binary and documentation files
+      shell: bash
+      run: |
+        cp target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}${{ runner.os == 'Windows' && '.exe' || '' }} artifacts/
+        cp LICENSE.md README.md CHANGELOG.md artifacts/
+    
+    - name: Compress artifacts (Unix)
+      if: runner.os != 'Windows'
+      working-directory: artifacts
+      run: ${{ matrix.compress }} ../${{ matrix.asset_name }} *
+    
+    - name: Compress artifacts (Windows)
+      if: runner.os == 'Windows'
+      shell: bash
+      working-directory: artifacts
+      run: ${{ matrix.compress }} ../${{ matrix.asset_name }} *
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ matrix.name }}
+        path: ${{ matrix.asset_name }}
+        if-no-files-found: error
+  
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Get version from tag
+        id: get_version
+        run: |
+          echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+          echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: ./artifacts
+      
+      - name: Display artifact structure
+        run: |
+          ls -la ./artifacts
+          find ./artifacts -type f | sort
+      
+      - name: Generate checksums
+        run: |
+          find ./artifacts -type f -not -path '*/\.*' -exec sha256sum {} \; > CHECKSUMS.txt
+          cat CHECKSUMS.txt
+      
+      - name: Generate release notes
+        id: generate_notes
+        run: |
+          echo "# hns v$VERSION - Hacker News CLI" > RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "## Changelog" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          # Extract the relevant section from CHANGELOG.md
+          VERSION_PATTERN="\[${VERSION}\]"
+          CHANGELOG_SECTION=$(sed -n "/## ${VERSION_PATTERN}/,/## \[/p" CHANGELOG.md | sed '$d')
+          if [ -n "$CHANGELOG_SECTION" ]; then
+            echo "$CHANGELOG_SECTION" >> RELEASE_NOTES.md
+          else
+            echo "- New release: v$VERSION" >> RELEASE_NOTES.md
+          fi
+          echo "" >> RELEASE_NOTES.md
+          echo "## Installation" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "### Linux/macOS" >> RELEASE_NOTES.md
+          echo '```bash' >> RELEASE_NOTES.md
+          echo "# Extract the archive" >> RELEASE_NOTES.md
+          echo 'tar -xzf hns-[platform].tar.gz' >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "# Move binary to your PATH" >> RELEASE_NOTES.md
+          echo 'sudo mv hns /usr/local/bin/' >> RELEASE_NOTES.md
+          echo '```' >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "### Windows" >> RELEASE_NOTES.md
+          echo "1. Extract the ZIP file" >> RELEASE_NOTES.md
+          echo "2. Move the executable to your desired location" >> RELEASE_NOTES.md
+          echo "3. Optionally add to your PATH" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "## SHA256 Checksums" >> RELEASE_NOTES.md
+          echo '```' >> RELEASE_NOTES.md
+          cat CHECKSUMS.txt >> RELEASE_NOTES.md
+          echo '```' >> RELEASE_NOTES.md
+          cat RELEASE_NOTES.md
+      
+      - name: Create release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: hns ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+          files: |
+            ./artifacts/hns-linux-amd64/hns-linux-amd64.tar.gz
+            ./artifacts/hns-darwin-amd64/hns-darwin-amd64.tar.gz
+            ./artifacts/hns-darwin-arm64/hns-darwin-arm64.tar.gz
+            ./artifacts/hns-windows-amd64/hns-windows-amd64.zip
+            CHECKSUMS.txt
+            
+  # publish-crate:
+  #   name: Publish to crates.io
+  #   needs: release
+  #   runs-on: ubuntu-latest
+  #   if: startsWith(github.ref, 'refs/tags/')
+  #   steps:
+  #     - uses: actions/checkout@v4
+        
+  #     - name: Setup Rust
+  #       uses: dtolnay/rust-toolchain@stable
+        
+  #     - name: Check crate version matches tag
+  #       run: |
+  #         TAG_VERSION=${GITHUB_REF#refs/tags/v}
+  #         CRATE_VERSION=$(grep -m1 -o 'version = "[^"]*"' Cargo.toml | cut -d'"' -f2)
+  #         if [ "$TAG_VERSION" != "$CRATE_VERSION" ]; then
+  #           echo "::error::Tag version ($TAG_VERSION) doesn't match crate version ($CRATE_VERSION)!"
+  #           exit 1
+  #         fi
+        
+  #     - name: Login to crates.io
+  #       run: cargo login ${{ secrets.CRATES_IO_TOKEN }}
+        
+  #     - name: Publish to crates.io
+  #       run: cargo publish --no-verify

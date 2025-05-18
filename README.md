@@ -74,6 +74,14 @@ For each story, the tool displays:
 - Rust 1.70.0 or higher
 - Cargo
 
+### Development Tools
+
+The project includes several files to help with development:
+
+- `Makefile` - Common development tasks (run `make help` for details)
+- `CHANGELOG.md` - Track changes between versions
+- `CONTRIBUTING.md` - Guidelines for contributors
+
 ### Dependencies
 
 - `clap` - Command-line argument parsing
@@ -103,6 +111,32 @@ cargo build --release
 ```bash
 cargo test
 ```
+
+### Release Process
+
+This project uses GitHub Actions for continuous integration and deployment. The workflow automatically:
+
+1. Tests the codebase
+2. Builds binaries for multiple platforms (Linux, macOS Intel/ARM, Windows)
+3. Creates GitHub releases with packaged artifacts when tags are pushed
+4. Publishes to crates.io when a new version is tagged
+
+To create a new release:
+
+```bash
+# 1. Update the version in Cargo.toml
+# 2. Commit the changes
+git add Cargo.toml
+git commit -m "Bump version to x.y.z"
+
+# 3. Tag the commit
+git tag -a vx.y.z -m "Release version x.y.z"
+
+# 4. Push to GitHub with tags
+git push && git push --tags
+```
+
+> **Note:** To enable publishing to crates.io, you must set the `CRATES_IO_TOKEN` secret in your GitHub repository settings.
 
 ## API
 

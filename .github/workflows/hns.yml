@@ -68,6 +68,12 @@ jobs:
       with:
         targets: ${{ matrix.target }}
     
+    - name: Install zip (Windows only)
+      if: runner.os == 'Windows'
+      run: |
+        choco install zip -y
+        refreshenv
+
     - name: Build release binary
       run: cargo build --release --locked --target ${{ matrix.target }}
     

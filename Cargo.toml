@@ -12,3 +12,6 @@ clap = { version = "4.0", features = ["derive"] }
 chrono = "0.4" # Added for timestamp conversion
 scraper = "0.23.1" # Added for HTML parsing
 ego-tree = "0.10.0"
+ollama = "0.1.0" # Added for summarization
+langchain = "0.1.0" # Added for summarization
+gemma3-1b = "0.1.0" # Added for summarization

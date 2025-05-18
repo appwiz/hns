@@ -27,6 +27,18 @@ cd hns
 cargo install --path .
 ```
 
+### Installing Ollama
+
+To install Ollama, follow the instructions on the [Ollama GitHub page](https://github.com/ollama/ollama).
+
+### Installing Gemma3-1b Model
+
+To install the Gemma3-1b model, follow the instructions on the [Gemma3-1b GitHub page](https://github.com/gemma3-1b/gemma3-1b).
+
+### Installing Rust Toolchain
+
+To install the Rust toolchain, follow the instructions on the [Rust website](https://www.rust-lang.org/tools/install).
+
 ## Usage
 
 Run the tool with default settings (shows 5 top stories):
@@ -91,6 +103,9 @@ The project includes several files to help with development:
 - `chrono` - Timestamp formatting
 - `scraper` - HTML parsing
 - `ego-tree` - Tree data structure for HTML parsing
+- `ollama` - Summarization
+- `langchain` - Summarization
+- `gemma3-1b` - Summarization
 
 ### Building from Source
 

@@ -5,6 +5,9 @@ use reqwest;
 use scraper::node::Node;
 use scraper::{ElementRef, Html};
 use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::PathBuf;
+use tokio::fs as async_fs;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -116,8 +119,44 @@ fn process_html_node(node_ref: NodeRef<'_, Node>, processed_text: &mut String) {
     }
 }
 
+async fn fetch_url_content(url: &str) -> Result<String, reqwest::Error> {
+    let response = reqwest::get(url).await?;
+    let content = response.text().await?;
+    Ok(content)
+}
+
+async fn summarize_content(content: &str) -> Result<String, Box<dyn std::error::Error>> {
+    // Placeholder for actual summarization logic using langchain and gemma3-1b via ollama
+    // Replace this with actual implementation
+    Ok(content.to_string())
+}
+
+async fn get_summary_path(story_id: u32) -> PathBuf {
+    let mut path = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("."));
+    path.push("hns");
+    path.push(format!("summary_{}.txt", story_id));
+    path
+}
+
+async fn read_summary_from_file(path: &PathBuf) -> Option<String> {
+    if path.exists() {
+        if let Ok(content) = async_fs::read_to_string(path).await {
+            return Some(content);
+        }
+    }
+    None
+}
+
+async fn write_summary_to_file(path: &PathBuf, summary: &str) -> Result<(), std::io::Error> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    async_fs::write(path, summary).await?;
+    Ok(())
+}
+
 #[tokio::main]
-async fn main() -> Result<(), reqwest::Error> {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     println!("Top {} Hacker News Stories:", args.max_stories);
@@ -205,6 +244,16 @@ async fn main() -> Result<(), reqwest::Error> {
             // Only print URL if not a Show HN and no text
             if let Some(url) = &story.url {
                 println!("URL: {}", url);
+
+                let summary_path = get_summary_path(story.id).await;
+                if let Some(existing_summary) = read_summary_from_file(&summary_path).await {
+                    println!("Summary: {}", existing_summary);
+                } else {
+                    let content = fetch_url_content(url).await?;
+                    let summary = summarize_content(&content).await?;
+                    println!("Summary: {}", summary);
+                    write_summary_to_file(&summary_path, &summary).await?;
+                }
             }
         }
     }

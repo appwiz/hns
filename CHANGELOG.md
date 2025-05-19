@@ -19,3 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Command-line argument for configuring number of stories
 - HTML parsing and proper text formatting
 - Special handling for "Show HN" posts
+
+## [0.3.0] - 2025-05-17
+### Added 
+- Optionally summarize articles using Ollama and a local LLM. 

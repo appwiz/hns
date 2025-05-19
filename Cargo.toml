@@ -12,3 +12,4 @@ clap = { version = "4.0", features = ["derive"] }
 chrono = "0.4" # Added for timestamp conversion
 scraper = "0.23.1" # Added for HTML parsing
 ego-tree = "0.10.0"
+html2text = "0.5.0"  # HTML to text conversion

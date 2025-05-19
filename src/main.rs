@@ -5,6 +5,8 @@ use reqwest;
 use scraper::node::Node;
 use scraper::{ElementRef, Html};
 use serde::{Deserialize, Serialize};
+use serde_json;
+use html2text::from_read;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -12,6 +14,10 @@ struct Args {
     /// Maximum number of stories to display (default: 5, max: 25)
     #[clap(short = 'm', long = "max-stories", default_value = "5", value_parser = clap::value_parser!(u8).range(1..=25))]
     max_stories: u8,
+
+    /// Enable URL summarization (placeholder)
+    #[clap(long = "summarize", action)]
+    summarize: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)] // Added Clone
@@ -116,6 +122,77 @@ fn process_html_node(node_ref: NodeRef<'_, Node>, processed_text: &mut String) {
     }
 }
 
+async fn summarize_url(url: &str) -> Result<String, Box<dyn std::error::Error>> {
+    // Step 1: Fetch the webpage content
+    print!("Fetching... ");
+    let response = reqwest::get(url).await?;
+    
+    if !response.status().is_success() {
+        return Ok(format!("Failed to fetch URL: {}", response.status()));
+    }
+    
+    let html_content = response.text().await?;
+    
+    // Step 2: Convert HTML to plain text (extract main content)
+    print!("Processing... ");
+    let plain_text = from_read(html_content.as_bytes(), 10000); // 10000 chars width to avoid unwanted line breaks
+    
+    // Trim and limit the content length to avoid overwhelming the LLM
+    let trimmed_text = plain_text.trim();
+    let content_to_summarize = if trimmed_text.len() > 4000 {
+        format!("{}...", &trimmed_text[0..4000])
+    } else {
+        trimmed_text.to_string()
+    };
+    
+    // Step 3: Create the prompt for the LLM
+    let prompt = format!(
+        "Summarize the following article in 3-5 sentences. Only return the summary. Here is the article:\n\n{}",
+        content_to_summarize
+    );
+    
+    // Step 4: Call the LLM (gemma3:4b) via Ollama API directly
+    print!("Summarizing... ");
+    // Create payload for Ollama API
+    let ollama_url = "http://localhost:11434/api/generate";
+    let client = reqwest::Client::new();
+    
+    let payload = serde_json::json!({
+        "model": "gemma3:4b",
+        "prompt": prompt,
+        "stream": false,
+        "temperature": 0.7
+    });
+    
+    // Call Ollama API
+    let result = client.post(ollama_url)
+        .json(&payload)
+        .send()
+        .await?
+        .json::<serde_json::Value>()
+        .await;
+    
+    println!("Done.");
+    // Process response
+    match result {
+        Ok(response) => {
+            if let Some(generated_text) = response.get("response").and_then(|v| v.as_str()) {
+                let summary = generated_text.trim().to_string();
+                if summary.is_empty() {
+                    Ok("Summary generation failed".to_string())
+                } else {
+                    Ok(summary)
+                }
+            } else {
+                Ok("Failed to extract summary from response".to_string())
+            }
+        },
+        Err(e) => {
+            Ok(format!("Error generating summary: {}", e))
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), reqwest::Error> {
     let args = Args::parse();
@@ -168,6 +245,12 @@ async fn main() -> Result<(), reqwest::Error> {
         if is_show_hn {
             if let Some(url) = &story.url {
                 println!("URL: {}", url);
+                if args.summarize {
+                    match summarize_url(url).await {
+                        Ok(summary) => println!("Summary: {}", summary),
+                        Err(e) => println!("Failed to generate summary: {}", e),
+                    }
+                }
             }
         }
 
@@ -205,6 +288,12 @@ async fn main() -> Result<(), reqwest::Error> {
             // Only print URL if not a Show HN and no text
             if let Some(url) = &story.url {
                 println!("URL: {}", url);
+                if args.summarize {
+                    match summarize_url(url).await {
+                        Ok(summary) => println!("Summary: {}", summary),
+                        Err(e) => println!("Failed to generate summary: {}", e),
+                    }
+                }
             }
         }
     }

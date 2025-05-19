@@ -2,7 +2,8 @@
 
 A command-line interface for fetching and displaying top stories from Hacker News.
 
-## Description
+## De- `html2text` - HTML to text conversion
+- `serde_json` - JSON serialization/deserialization for Ollama APIption
 
 `hns` is a simple, fast Rust command-line tool that pulls top stories from the official Hacker News API and displays them in a clean, readable format. The tool shows story titles, authors, timestamps, text content, and URLs in a structured way, making it easy to browse Hacker News without leaving your terminal.
 
@@ -13,6 +14,7 @@ A command-line interface for fetching and displaying top stories from Hacker New
 - Clean formatting with proper handling of HTML content
 - Special handling for "Show HN" posts
 - Proper decoding of HTML entities
+- AI-powered URL summarization using gemma3:4b model
 
 ## Installation
 
@@ -25,6 +27,21 @@ cd hns
 
 # Build and install
 cargo install --path .
+```
+
+### Summarization Dependencies
+
+To use the `--summarize` feature, you need to have Ollama running with the gemma3:4b model installed:
+
+1. [Install Ollama](https://ollama.ai/) following the official instructions
+2. Pull the gemma3:4b model:
+```bash
+ollama pull gemma3:4b
+```
+3. Ensure Ollama is running before using the `--summarize` flag
+```bash
+# Start Ollama (keep running in a separate terminal)
+ollama serve
 ```
 
 ## Usage
@@ -40,6 +57,7 @@ hns
 | Argument | Short | Description | Default | Range |
 |----------|-------|-------------|---------|-------|
 | `--max-stories` | `-m` | Maximum number of stories to display | 5 | 1-25 |
+| `--summarize` |  | Enable URL summarization using gemma3:4b model | false | - |
 | `--help` | `-h` | Display help information | - | - |
 | `--version` | `-V` | Display version information | - | - |
 
@@ -55,6 +73,18 @@ Display the maximum number of stories:
 
 ```bash
 hns --max-stories 25
+```
+
+Display stories with URL summaries:
+
+```bash
+hns --summarize
+```
+
+Display 10 stories with URL summaries:
+
+```bash
+hns -m 10 --summarize
 ```
 
 ## Output Format
@@ -91,6 +121,10 @@ The project includes several files to help with development:
 - `chrono` - Timestamp formatting
 - `scraper` - HTML parsing
 - `ego-tree` - Tree data structure for HTML parsing
+- `langchain` - LangChain framework for Rust
+- `langchain_ollama` - LangChain integration for Ollama
+- `html2text` - HTML to text conversion
+- `url` - URL parsing and manipulation
 
 ### Building from Source
 

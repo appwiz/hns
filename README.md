@@ -13,6 +13,12 @@ A command-line interface for fetching and displaying top stories from Hacker New
 - Proper decoding of HTML entities
 - AI-powered URL summarization using Ollama's gemma3:4b model
 
+## Example
+```
+% hns --summarize
+```
+![displays how summarization works](hns-summarize.png)
+
 ## Installation
 
 Ensure you have Rust and Cargo installed. Then:

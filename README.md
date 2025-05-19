@@ -2,9 +2,6 @@
 
 A command-line interface for fetching and displaying top stories from Hacker News.
 
-## De- `html2text` - HTML to text conversion
-- `serde_json` - JSON serialization/deserialization for Ollama APIption
-
 `hns` is a simple, fast Rust command-line tool that pulls top stories from the official Hacker News API and displays them in a clean, readable format. The tool shows story titles, authors, timestamps, text content, and URLs in a structured way, making it easy to browse Hacker News without leaving your terminal.
 
 ## Features
@@ -14,7 +11,7 @@ A command-line interface for fetching and displaying top stories from Hacker New
 - Clean formatting with proper handling of HTML content
 - Special handling for "Show HN" posts
 - Proper decoding of HTML entities
-- AI-powered URL summarization using gemma3:4b model
+- AI-powered URL summarization using Ollama's gemma3:4b model
 
 ## Installation
 
@@ -115,16 +112,14 @@ The project includes several files to help with development:
 ### Dependencies
 
 - `clap` - Command-line argument parsing
-- `reqwest` - HTTP client for API requests
+- `reqwest` - HTTP client for API requests (and Ollama API calls)
 - `tokio` - Asynchronous runtime
 - `serde` - JSON serialization/deserialization
+- `serde_json` - JSON serialization/deserialization for Ollama API
 - `chrono` - Timestamp formatting
 - `scraper` - HTML parsing
 - `ego-tree` - Tree data structure for HTML parsing
-- `langchain` - LangChain framework for Rust
-- `langchain_ollama` - LangChain integration for Ollama
-- `html2text` - HTML to text conversion
-- `url` - URL parsing and manipulation
+- `html2text` - HTML to text conversion for URL content
 
 ### Building from Source
 

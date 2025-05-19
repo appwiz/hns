@@ -74,6 +74,46 @@ prepare-release:
 	@echo "4. Run 'git tag -a v$(VERSION) -m \"Release version $(VERSION)\"'"
 	@echo "5. Run 'git push && git push --tags'"
 
+# Add a new entry to CHANGELOG.md
+.PHONY: changelog-entry
+changelog-entry:
+	@echo "Adding a new entry to CHANGELOG.md for version $(VERSION)..."
+	@DATE=$$(date +"%Y-%m-%d"); \
+	TMP_CHANGELOG="/tmp/hns-changelog-$$$$.md"; \
+	if grep -q "## \[$(VERSION)\]" CHANGELOG.md; then \
+		sed "s/## \[$(VERSION)\] - [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/## [$(VERSION)] - $$DATE/" CHANGELOG.md > $$TMP_CHANGELOG; \
+		mv $$TMP_CHANGELOG CHANGELOG.md; \
+		echo "Updated existing entry for version $(VERSION) with today's date"; \
+	else \
+		awk -v version="$(VERSION)" -v date="$$DATE" ' \
+			/## \[Unreleased\]/ { \
+				print $$0; \
+				getline; \
+				print $$0; \
+				print "\n## [" version "] - " date; \
+				print "### Added"; \
+				print "- "; \
+				print ""; \
+				next; \
+			} \
+			{print} \
+		' CHANGELOG.md > $$TMP_CHANGELOG; \
+		mv $$TMP_CHANGELOG CHANGELOG.md; \
+		echo "Created new entry for version $(VERSION)"; \
+		echo "Please edit CHANGELOG.md to add release notes"; \
+	fi
+	@echo "Changelog updated. Don't forget to review and commit the changes!"
+
+# Tag version from Cargo.toml (assumes CHANGELOG.md is already updated)
+.PHONY: tag-version
+tag-version:
+	@echo "Tagging version $(VERSION) from Cargo.toml"
+	@echo "Assuming CHANGELOG.md has already been updated for version $(VERSION)"
+	@git add Cargo.toml CHANGELOG.md
+	@git commit -m "Bump version to $(VERSION)"
+	@git tag -a v$(VERSION) -m "Release version $(VERSION)"
+	@echo "Created tag v$(VERSION). To push, run: git push && git push --tags"
+
 # Help
 .PHONY: help
 help:
@@ -93,4 +133,6 @@ help:
 	@echo "  lint        Lint code"
 	@echo "  install     Install binary to ~/.local/bin"
 	@echo "  prepare-release  Steps to prepare a release"
+	@echo "  changelog-entry  Add a new entry to CHANGELOG.md for the current version"
+	@echo "  tag-version      Tag the current version (assumes Cargo.toml and CHANGELOG.md are updated)"
 	@echo "  help        Show this help"

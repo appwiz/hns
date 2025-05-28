@@ -1,5 +1,5 @@
 use chrono::{TimeZone, Utc};
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use ego_tree::NodeRef;
 use reqwest;
 use scraper::node::Node;
@@ -7,6 +7,7 @@ use scraper::{ElementRef, Html};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use html2text::from_read;
+use std::process;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -14,10 +15,22 @@ struct Args {
     /// Maximum number of stories to display (default: 5, max: 25)
     #[clap(short = 'm', long = "max-stories", default_value = "5", value_parser = clap::value_parser!(u8).range(1..=25))]
     max_stories: u8,
+    
+    #[clap(subcommand)]
+    command: Option<Command>,
+}
 
-    /// Enable URL summarization (placeholder)
-    #[clap(long = "summarize", action)]
-    summarize: bool,
+#[derive(Subcommand, Debug)]
+enum Command {
+    /// Check system health and dependencies for HNS
+    Doctor,
+    
+    /// Summarize a URL using AI
+    Summarize {
+        /// URL to summarize
+        #[clap(value_parser = clap::value_parser!(String))]
+        url: String,
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)] // Added Clone
@@ -193,9 +206,193 @@ async fn summarize_url(url: &str) -> Result<String, Box<dyn std::error::Error>> 
     }
 }
 
+// Doctor command functions
+async fn check_network_connectivity() -> Result<Vec<(String, bool)>, reqwest::Error> {
+    // URLs to check
+    let urls = vec![
+        "https://hacker-news.firebaseio.com/v0/topstories.json?print=pretty",
+        "https://hacker-news.firebaseio.com/v0/item/1.json?print=pretty"
+    ];
+    
+    let mut results = Vec::new();
+    
+    for url in urls {
+        let response = reqwest::get(url).await?;
+        results.push((url.to_string(), response.status().is_success()));
+    }
+    
+    Ok(results)
+}
+
+async fn check_ollama_service() -> bool {
+    // Try to connect to Ollama service
+    let ollama_url = "http://localhost:11434/api/version";
+    match reqwest::Client::new().get(ollama_url).send().await {
+        Ok(response) => response.status().is_success(),
+        Err(_) => false,
+    }
+}
+
+async fn check_ollama_model() -> Result<Vec<(String, bool)>, Box<dyn std::error::Error>> {
+    // List of models to check
+    let models_to_check = vec!["gemma3:4b"];
+    
+    let ollama_url = "http://localhost:11434/api/tags";
+    let client = reqwest::Client::new();
+    
+    // Call Ollama API to list models
+    let result = client.get(ollama_url).send().await?;
+    
+    if !result.status().is_success() {
+        return Ok(models_to_check.into_iter().map(|m| (m.to_string(), false)).collect());
+    }
+    
+    let response = result.json::<serde_json::Value>().await?;
+    
+    let mut model_status = Vec::new();
+    
+    // Extract model names
+    if let Some(models) = response.get("models").and_then(|m| m.as_array()) {
+        // Check each required model
+        for model_name in models_to_check {
+            let has_model = models.iter().any(|model| {
+                model.get("name").and_then(|n| n.as_str()) == Some(model_name)
+            });
+            model_status.push((model_name.to_string(), has_model));
+        }
+    } else {
+        // If we can't get the model list, return all as unavailable
+        for model_name in models_to_check {
+            model_status.push((model_name.to_string(), false));
+        }
+    }
+    
+    Ok(model_status)
+}
+
+// We don't need a separate system dependencies check function anymore
+// as we check specific dependencies like network and Ollama
+
+async fn run_doctor() -> i32 {
+    println!("🔍 Running HNS diagnostics...\n");
+    
+    let mut exit_code = 0;
+    
+    // Network Connectivity Check
+    match check_network_connectivity().await {
+        Ok(results) => {
+            let all_successful = results.iter().all(|(_, success)| *success);
+            
+            if all_successful {
+                println!("✓ Network connectivity: All API endpoints accessible");
+                // Print each URL we checked
+                for (url, _) in &results {
+                    println!("  → {}", url);
+                }
+            } else {
+                for (url, success) in &results {
+                    if *success {
+                        println!("✓ Network connectivity: Connected to {}", url);
+                    } else {
+                        println!("✗ Network connectivity: Failed to connect to {}", url);
+                        println!("  → Suggestion: Check your internet connection and try again");
+                        exit_code = 1;
+                    }
+                }
+            }
+        },
+        Err(e) => {
+            println!("✗ Network connectivity: Error connecting to API - {}", e);
+            println!("  → Suggestion: Check your internet connection and try again");
+            exit_code = 1;
+        }
+    }
+    
+    // Ollama Service Check
+    match check_ollama_service().await {
+        true => println!("✓ Ollama service: Running and accessible"),
+        false => {
+            println!("✗ Ollama service: Not running or not accessible");
+            println!("  → Suggestion: Start Ollama with 'ollama serve'");
+            exit_code = 1;
+        }
+    }
+    
+    // Ollama Model Check
+    match check_ollama_model().await {
+        Ok(model_statuses) => {
+            let all_available = model_statuses.iter().all(|(_, available)| *available);
+            
+            if all_available {
+                println!("✓ Ollama models: All required models are available");
+                for (model, _) in &model_statuses {
+                    println!("  → {}", model);
+                }
+            } else {
+                for (model, available) in &model_statuses {
+                    if *available {
+                        println!("✓ Ollama model: {} is available", model);
+                    } else {
+                        println!("✗ Ollama model: {} is not available", model);
+                        println!("  → Suggestion: Pull the model with 'ollama pull {}'", model);
+                        exit_code = 1;
+                    }
+                }
+            }
+        },
+        Err(e) => {
+            println!("⚠ Ollama model check: Error checking models - {}", e);
+            println!("  → Suggestion: Make sure Ollama is running with 'ollama serve'");
+            exit_code = 1;
+        }
+    }
+    
+    // Summary
+    println!("\n🩺 Diagnosis Summary:");
+    if exit_code == 0 {
+        println!("All checks passed! HNS is ready to use.");
+    } else {
+        println!("Some checks failed. Please address the issues above.");
+    }
+    
+    exit_code
+}
+
+async fn run_summarize(url: &str) -> i32 {
+    println!("🔍 Summarizing URL: {}", url);
+    
+    match summarize_url(url).await {
+        Ok(summary) => {
+            println!("\n📝 Summary:");
+            println!("{}", summary);
+            0
+        },
+        Err(e) => {
+            eprintln!("\n❌ Failed to generate summary: {}", e);
+            eprintln!("  → Make sure Ollama is running and the gemma3:4b model is available.");
+            eprintln!("  → Run 'hns doctor' to check system dependencies.");
+            1
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), reqwest::Error> {
     let args = Args::parse();
+
+    // Handle subcommands
+    if let Some(command) = &args.command {
+        match command {
+            Command::Doctor => {
+                let exit_code = run_doctor().await;
+                process::exit(exit_code);
+            }
+            Command::Summarize { url } => {
+                let exit_code = run_summarize(url).await;
+                process::exit(exit_code);
+            }
+        }
+    }
 
     println!("Top {} Hacker News Stories:", args.max_stories);
 
@@ -245,12 +442,6 @@ async fn main() -> Result<(), reqwest::Error> {
         if is_show_hn {
             if let Some(url) = &story.url {
                 println!("URL: {}", url);
-                if args.summarize {
-                    match summarize_url(url).await {
-                        Ok(summary) => println!("Summary: {}", summary),
-                        Err(e) => println!("Failed to generate summary: {}", e),
-                    }
-                }
             }
         }
 
@@ -288,12 +479,6 @@ async fn main() -> Result<(), reqwest::Error> {
             // Only print URL if not a Show HN and no text
             if let Some(url) = &story.url {
                 println!("URL: {}", url);
-                if args.summarize {
-                    match summarize_url(url).await {
-                        Ok(summary) => println!("Summary: {}", summary),
-                        Err(e) => println!("Failed to generate summary: {}", e),
-                    }
-                }
             }
         }
     }

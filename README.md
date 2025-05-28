@@ -12,6 +12,7 @@ A command-line interface for fetching and displaying top stories from Hacker New
 - Special handling for "Show HN" posts
 - Proper decoding of HTML entities
 - AI-powered URL summarization using Ollama's gemma3:4b model
+- System health check via the `doctor` command
 
 ## Example
 ```
@@ -60,9 +61,15 @@ hns
 | Argument | Short | Description | Default | Range |
 |----------|-------|-------------|---------|-------|
 | `--max-stories` | `-m` | Maximum number of stories to display | 5 | 1-25 |
-| `--summarize` |  | Enable URL summarization using gemma3:4b model | false | - |
 | `--help` | `-h` | Display help information | - | - |
 | `--version` | `-V` | Display version information | - | - |
+
+### Subcommands
+
+| Command | Description |
+|---------|-------------|
+| `doctor` | Check system health and dependencies |
+| `summarize` | Summarize a URL using AI |
 
 #### Examples
 
@@ -78,16 +85,16 @@ Display the maximum number of stories:
 hns --max-stories 25
 ```
 
-Display stories with URL summaries:
+Run the system health check:
 
 ```bash
-hns --summarize
+hns doctor
 ```
 
-Display 10 stories with URL summaries:
+Summarize a specific URL:
 
 ```bash
-hns -m 10 --summarize
+hns summarize https://example.com/article
 ```
 
 ## Output Format
@@ -99,6 +106,45 @@ For each story, the tool displays:
 3. Story title
 4. For "Show HN" posts: URL followed by text content (if available)
 5. For regular posts: Text content (if available) or URL
+
+### Doctor Command Output
+
+The `doctor` command checks the health of your system and the necessary dependencies for HNS:
+
+1. Network Connectivity: Tests connection to the Hacker News API
+2. Ollama Service: Checks if Ollama is running and accessible
+3. Ollama Model: Verifies that the gemma3:4b model is available
+4. System Dependencies: Basic runtime environment verification
+
+Each check displays a clear status indicator:
+- ✓ Success
+- ✗ Failure
+- ⚠ Warning
+
+For any failures, the command provides actionable suggestions to fix the issues.
+
+### Summarize Command Output
+
+The `summarize` command provides an AI-generated summary of any webpage using the gemma3:4b model:
+
+1. Fetches the URL content (HTML)
+2. Processes the content to extract readable text
+3. Sends the text to the local Ollama service with gemma3:4b model
+4. Returns a concise 3-5 sentence summary of the article
+
+Usage example:
+```bash
+$ hns summarize https://example.com/long-article
+🔍 Summarizing URL: https://example.com/long-article
+Fetching... Processing... Summarizing... Done.
+
+📝 Summary:
+This article discusses the importance of sustainable technology practices. 
+It highlights three key approaches: reducing e-waste through longer device 
+lifecycles, developing energy-efficient software, and implementing circular 
+economy principles in manufacturing. The author argues that both individual 
+and corporate responsibility are necessary to create meaningful change.
+```
 
 ## Development
 

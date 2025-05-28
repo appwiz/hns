@@ -15,7 +15,7 @@ A command-line interface for fetching and displaying top stories from Hacker New
 
 ## Example
 ```
-% hns --summarize
+% hns summarize
 ```
 ![displays how summarization works](hns-summarize.png)
 
@@ -34,14 +34,14 @@ cargo install --path .
 
 ### Summarization Dependencies
 
-To use the `--summarize` feature, you need to have Ollama running with the gemma3:4b model installed:
+To use the summarization features, you need to have Ollama running with the gemma3:4b model installed:
 
 1. [Install Ollama](https://ollama.ai/) following the official instructions
 2. Pull the gemma3:4b model:
 ```bash
 ollama pull gemma3:4b
 ```
-3. Ensure Ollama is running before using the `--summarize` flag
+3. Ensure Ollama is running before using summarization
 ```bash
 # Start Ollama (keep running in a separate terminal)
 ollama serve
@@ -49,10 +49,41 @@ ollama serve
 
 ## Usage
 
-Run the tool with default settings (shows 5 top stories):
+### Default Behavior
+
+When run without any subcommands, `hns` defaults to summarizing 5 stories:
 
 ```bash
-hns
+hns                       # Same as 'hns summarize -m 5'
+```
+
+### Subcommands
+
+#### Show Stories
+
+Show Hacker News stories with customizable options:
+
+```bash
+hns show                 # Show 5 stories (default)
+hns show -m 10           # Show 10 stories
+hns show --max-stories 25  # Show maximum 25 stories
+```
+
+#### Summarize Stories
+
+Show Hacker News stories with AI-powered URL summaries:
+
+```bash
+hns summarize            # Show 5 stories with summaries
+hns summarize -m 10      # Show 10 stories with summaries
+```
+
+#### Doctor Diagnostics
+
+Run diagnostic checks to verify system setup:
+
+```bash
+hns doctor               # Check network connectivity and Ollama models
 ```
 
 ### Command-line Arguments
@@ -60,35 +91,8 @@ hns
 | Argument | Short | Description | Default | Range |
 |----------|-------|-------------|---------|-------|
 | `--max-stories` | `-m` | Maximum number of stories to display | 5 | 1-25 |
-| `--summarize` |  | Enable URL summarization using gemma3:4b model | false | - |
 | `--help` | `-h` | Display help information | - | - |
 | `--version` | `-V` | Display version information | - | - |
-
-#### Examples
-
-Display the top 10 stories:
-
-```bash
-hns -m 10
-```
-
-Display the maximum number of stories:
-
-```bash
-hns --max-stories 25
-```
-
-Display stories with URL summaries:
-
-```bash
-hns --summarize
-```
-
-Display 10 stories with URL summaries:
-
-```bash
-hns -m 10 --summarize
-```
 
 ## Output Format
 

@@ -12,6 +12,7 @@ A command-line interface for fetching and displaying top stories from Hacker New
 - Special handling for "Show HN" posts
 - Proper decoding of HTML entities
 - AI-powered URL summarization using Ollama's gemma3:4b model
+- System health check via the `doctor` command
 
 ## Example
 ```
@@ -64,6 +65,12 @@ hns
 | `--help` | `-h` | Display help information | - | - |
 | `--version` | `-V` | Display version information | - | - |
 
+### Subcommands
+
+| Command | Description |
+|---------|-------------|
+| `doctor` | Check system health and dependencies |
+
 #### Examples
 
 Display the top 10 stories:
@@ -90,6 +97,12 @@ Display 10 stories with URL summaries:
 hns -m 10 --summarize
 ```
 
+Run the system health check:
+
+```bash
+hns doctor
+```
+
 ## Output Format
 
 For each story, the tool displays:
@@ -99,6 +112,22 @@ For each story, the tool displays:
 3. Story title
 4. For "Show HN" posts: URL followed by text content (if available)
 5. For regular posts: Text content (if available) or URL
+
+### Doctor Command Output
+
+The `doctor` command checks the health of your system and the necessary dependencies for HNS:
+
+1. Network Connectivity: Tests connection to the Hacker News API
+2. Ollama Service: Checks if Ollama is running and accessible
+3. Ollama Model: Verifies that the gemma3:4b model is available
+4. System Dependencies: Basic runtime environment verification
+
+Each check displays a clear status indicator:
+- ✓ Success
+- ✗ Failure
+- ⚠ Warning
+
+For any failures, the command provides actionable suggestions to fix the issues.
 
 ## Development
 

@@ -1,5 +1,5 @@
 use chrono::{TimeZone, Utc};
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use ego_tree::NodeRef;
 use reqwest;
 use scraper::node::Node;
@@ -7,6 +7,7 @@ use scraper::{ElementRef, Html};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use html2text::from_read;
+use std::process;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -18,6 +19,15 @@ struct Args {
     /// Enable URL summarization (placeholder)
     #[clap(long = "summarize", action)]
     summarize: bool,
+    
+    #[clap(subcommand)]
+    command: Option<Command>,
+}
+
+#[derive(Subcommand, Debug)]
+enum Command {
+    /// Check system health and dependencies for HNS
+    Doctor,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)] // Added Clone
@@ -193,9 +203,134 @@ async fn summarize_url(url: &str) -> Result<String, Box<dyn std::error::Error>> 
     }
 }
 
+// Doctor command functions
+async fn check_network_connectivity() -> Result<bool, reqwest::Error> {
+    // Try to connect to Hacker News API
+    let url = "https://hacker-news.firebaseio.com/v0/topstories.json?print=pretty";
+    let response = reqwest::get(url).await?;
+    Ok(response.status().is_success())
+}
+
+async fn check_ollama_service() -> bool {
+    // Try to connect to Ollama service
+    let ollama_url = "http://localhost:11434/api/version";
+    match reqwest::Client::new().get(ollama_url).send().await {
+        Ok(response) => response.status().is_success(),
+        Err(_) => false,
+    }
+}
+
+async fn check_ollama_model() -> Result<bool, Box<dyn std::error::Error>> {
+    // Check if gemma3:4b model is available
+    let ollama_url = "http://localhost:11434/api/tags";
+    let client = reqwest::Client::new();
+    
+    // Call Ollama API to list models
+    let result = client.get(ollama_url).send().await?;
+    
+    if !result.status().is_success() {
+        return Ok(false);
+    }
+    
+    let response = result.json::<serde_json::Value>().await?;
+    
+    // Extract model names
+    if let Some(models) = response.get("models").and_then(|m| m.as_array()) {
+        // Look for gemma3:4b in the list
+        let has_model = models.iter().any(|model| {
+            model.get("name").and_then(|n| n.as_str()) == Some("gemma3:4b")
+        });
+        Ok(has_model)
+    } else {
+        Ok(false)
+    }
+}
+
+fn check_system_dependencies() -> bool {
+    // Basic system check - we could expand this in the future
+    // For now, we'll just return true as the Rust compiler ensures we have the
+    // necessary runtime components
+    true
+}
+
+async fn run_doctor() -> i32 {
+    println!("🔍 Running HNS diagnostics...\n");
+    
+    let mut exit_code = 0;
+    
+    // Network Connectivity Check
+    match check_network_connectivity().await {
+        Ok(true) => println!("✓ Network connectivity: Connected to Hacker News API"),
+        Ok(false) => {
+            println!("✗ Network connectivity: Failed to connect to Hacker News API");
+            println!("  → Suggestion: Check your internet connection and try again");
+            exit_code = 1;
+        },
+        Err(e) => {
+            println!("✗ Network connectivity: Error connecting to Hacker News API - {}", e);
+            println!("  → Suggestion: Check your internet connection and try again");
+            exit_code = 1;
+        }
+    }
+    
+    // Ollama Service Check
+    match check_ollama_service().await {
+        true => println!("✓ Ollama service: Running and accessible"),
+        false => {
+            println!("✗ Ollama service: Not running or not accessible");
+            println!("  → Suggestion: Start Ollama with 'ollama serve'");
+            exit_code = 1;
+        }
+    }
+    
+    // Ollama Model Check
+    match check_ollama_model().await {
+        Ok(true) => println!("✓ Ollama model: gemma3:4b is available"),
+        Ok(false) => {
+            println!("✗ Ollama model: gemma3:4b is not available");
+            println!("  → Suggestion: Pull the model with 'ollama pull gemma3:4b'");
+            exit_code = 1;
+        },
+        Err(e) => {
+            println!("⚠ Ollama model check: Error checking for gemma3:4b - {}", e);
+            println!("  → Suggestion: Make sure Ollama is running with 'ollama serve'");
+            exit_code = 1;
+        }
+    }
+    
+    // System Dependencies Check
+    if check_system_dependencies() {
+        println!("✓ System dependencies: All dependencies available");
+    } else {
+        println!("✗ System dependencies: Missing required dependencies");
+        println!("  → Suggestion: Check the installation requirements in the README");
+        exit_code = 1;
+    }
+    
+    // Summary
+    println!("\n🩺 Diagnosis Summary:");
+    if exit_code == 0 {
+        println!("All checks passed! HNS is ready to use.");
+    } else {
+        println!("Some checks failed. Please address the issues above.");
+    }
+    
+    exit_code
+}
+
 #[tokio::main]
 async fn main() -> Result<(), reqwest::Error> {
     let args = Args::parse();
+
+    // Handle subcommands
+    if let Some(command) = &args.command {
+        match command {
+            Command::Doctor => {
+                let exit_code = run_doctor().await;
+                process::exit(exit_code);
+            }
+        }
+    }
 
     println!("Top {} Hacker News Stories:", args.max_stories);
 

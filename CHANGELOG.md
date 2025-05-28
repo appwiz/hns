@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Integrated checks for network connectivity, Ollama service, and gemma3:4b model
 - Added clear status indicators and actionable error messages
 - Updated documentation with doctor command usage instructions
+### Changed
+- Converted `--summarize` flag to a `summarize` subcommand for consistency
+- Updated documentation to reflect the new subcommand structure
 
 ## [0.3.1] - 2025-05-18
 ### Added

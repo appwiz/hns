@@ -15,10 +15,6 @@ struct Args {
     /// Maximum number of stories to display (default: 5, max: 25)
     #[clap(short = 'm', long = "max-stories", default_value = "5", value_parser = clap::value_parser!(u8).range(1..=25))]
     max_stories: u8,
-
-    /// Enable URL summarization (placeholder)
-    #[clap(long = "summarize", action)]
-    summarize: bool,
     
     #[clap(subcommand)]
     command: Option<Command>,
@@ -28,6 +24,13 @@ struct Args {
 enum Command {
     /// Check system health and dependencies for HNS
     Doctor,
+    
+    /// Summarize a URL using AI
+    Summarize {
+        /// URL to summarize
+        #[clap(value_parser = clap::value_parser!(String))]
+        url: String,
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)] // Added Clone
@@ -318,6 +321,24 @@ async fn run_doctor() -> i32 {
     exit_code
 }
 
+async fn run_summarize(url: &str) -> i32 {
+    println!("🔍 Summarizing URL: {}", url);
+    
+    match summarize_url(url).await {
+        Ok(summary) => {
+            println!("\n📝 Summary:");
+            println!("{}", summary);
+            0
+        },
+        Err(e) => {
+            eprintln!("\n❌ Failed to generate summary: {}", e);
+            eprintln!("  → Make sure Ollama is running and the gemma3:4b model is available.");
+            eprintln!("  → Run 'hns doctor' to check system dependencies.");
+            1
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), reqwest::Error> {
     let args = Args::parse();
@@ -327,6 +348,10 @@ async fn main() -> Result<(), reqwest::Error> {
         match command {
             Command::Doctor => {
                 let exit_code = run_doctor().await;
+                process::exit(exit_code);
+            }
+            Command::Summarize { url } => {
+                let exit_code = run_summarize(url).await;
                 process::exit(exit_code);
             }
         }
@@ -380,12 +405,6 @@ async fn main() -> Result<(), reqwest::Error> {
         if is_show_hn {
             if let Some(url) = &story.url {
                 println!("URL: {}", url);
-                if args.summarize {
-                    match summarize_url(url).await {
-                        Ok(summary) => println!("Summary: {}", summary),
-                        Err(e) => println!("Failed to generate summary: {}", e),
-                    }
-                }
             }
         }
 
@@ -423,12 +442,6 @@ async fn main() -> Result<(), reqwest::Error> {
             // Only print URL if not a Show HN and no text
             if let Some(url) = &story.url {
                 println!("URL: {}", url);
-                if args.summarize {
-                    match summarize_url(url).await {
-                        Ok(summary) => println!("Summary: {}", summary),
-                        Err(e) => println!("Failed to generate summary: {}", e),
-                    }
-                }
             }
         }
     }

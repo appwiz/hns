@@ -61,7 +61,6 @@ hns
 | Argument | Short | Description | Default | Range |
 |----------|-------|-------------|---------|-------|
 | `--max-stories` | `-m` | Maximum number of stories to display | 5 | 1-25 |
-| `--summarize` |  | Enable URL summarization using gemma3:4b model | false | - |
 | `--help` | `-h` | Display help information | - | - |
 | `--version` | `-V` | Display version information | - | - |
 
@@ -70,6 +69,7 @@ hns
 | Command | Description |
 |---------|-------------|
 | `doctor` | Check system health and dependencies |
+| `summarize` | Summarize a URL using AI |
 
 #### Examples
 
@@ -85,22 +85,16 @@ Display the maximum number of stories:
 hns --max-stories 25
 ```
 
-Display stories with URL summaries:
-
-```bash
-hns --summarize
-```
-
-Display 10 stories with URL summaries:
-
-```bash
-hns -m 10 --summarize
-```
-
 Run the system health check:
 
 ```bash
 hns doctor
+```
+
+Summarize a specific URL:
+
+```bash
+hns summarize https://example.com/article
 ```
 
 ## Output Format
@@ -128,6 +122,29 @@ Each check displays a clear status indicator:
 - ⚠ Warning
 
 For any failures, the command provides actionable suggestions to fix the issues.
+
+### Summarize Command Output
+
+The `summarize` command provides an AI-generated summary of any webpage using the gemma3:4b model:
+
+1. Fetches the URL content (HTML)
+2. Processes the content to extract readable text
+3. Sends the text to the local Ollama service with gemma3:4b model
+4. Returns a concise 3-5 sentence summary of the article
+
+Usage example:
+```bash
+$ hns summarize https://example.com/long-article
+🔍 Summarizing URL: https://example.com/long-article
+Fetching... Processing... Summarizing... Done.
+
+📝 Summary:
+This article discusses the importance of sustainable technology practices. 
+It highlights three key approaches: reducing e-waste through longer device 
+lifecycles, developing energy-efficient software, and implementing circular 
+economy principles in manufacturing. The author argues that both individual 
+and corporate responsibility are necessary to create meaningful change.
+```
 
 ## Development
 

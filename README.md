@@ -49,17 +49,9 @@ ollama serve
 
 ## Usage
 
-### Default Behavior
-
-Run the tool with default settings (shows 5 top stories):
-
-```bash
-hns
-```
-
 ### Subcommands
 
-#### Show Stories (Default)
+#### Show Stories
 
 Show Hacker News stories with customizable options:
 
@@ -93,42 +85,6 @@ hns doctor               # Check network connectivity and Ollama models
 | `--max-stories` | `-m` | Maximum number of stories to display | 5 | 1-25 |
 | `--help` | `-h` | Display help information | - | - |
 | `--version` | `-V` | Display version information | - | - |
-
-### Backward Compatibility
-
-For backward compatibility, the following legacy commands still work:
-
-```bash
-hns -m 10                # Same as: hns show -m 10
-hns --max-stories 25     # Same as: hns show --max-stories 25
-hns --summarize          # Same as: hns summarize (deprecated)
-```
-
-#### Legacy Examples
-
-Display the top 10 stories:
-
-```bash
-hns -m 10
-```
-
-Display the maximum number of stories:
-
-```bash
-hns --max-stories 25
-```
-
-Display stories with URL summaries (deprecated):
-
-```bash
-hns --summarize
-```
-
-Display 10 stories with URL summaries (deprecated):
-
-```bash
-hns -m 10 --summarize
-```
 
 ## Output Format
 

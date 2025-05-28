@@ -12,15 +12,7 @@ use html2text::from_read;
 #[clap(author, version, about, long_about = None)]
 struct Args {
     #[clap(subcommand)]
-    command: Option<Commands>,
-
-    /// Maximum number of stories to display (default: 5, max: 25)
-    #[clap(short = 'm', long = "max-stories", default_value = "5", value_parser = clap::value_parser!(u8).range(1..=25))]
-    max_stories: u8,
-
-    /// Enable URL summarization (deprecated, use 'summarize' subcommand)
-    #[clap(long = "summarize", action, hide = true)]
-    summarize: bool,
+    command: Commands,
 }
 
 #[derive(Subcommand, Debug)]
@@ -302,26 +294,19 @@ async fn summarize_url(url: &str) -> Result<String, Box<dyn std::error::Error>> 
 async fn main() -> Result<(), reqwest::Error> {
     let args = Args::parse();
 
-    // Handle the doctor command separately
-    if let Some(Commands::Doctor) = args.command {
-        match run_doctor().await {
-            Ok(_) => return Ok(()),
-            Err(e) => {
-                eprintln!("Doctor diagnostics failed: {}", e);
-                std::process::exit(1);
+    // Determine max_stories and summarize flag based on command
+    let (max_stories, summarize) = match args.command {
+        Commands::Show { max_stories } => (max_stories, false),
+        Commands::Summarize { max_stories } => (max_stories, true),
+        Commands::Doctor => {
+            match run_doctor().await {
+                Ok(_) => return Ok(()),
+                Err(e) => {
+                    eprintln!("Doctor diagnostics failed: {}", e);
+                    std::process::exit(1);
+                }
             }
         }
-    }
-
-    // Determine max_stories and summarize flag based on command or global args
-    let (max_stories, summarize) = match args.command {
-        Some(Commands::Show { max_stories }) => (max_stories, false),
-        Some(Commands::Summarize { max_stories }) => (max_stories, true),
-        None => {
-            // Default behavior: use global args for backward compatibility
-            (args.max_stories, args.summarize)
-        },
-        Some(Commands::Doctor) => unreachable!(), // Already handled above
     };
 
     println!("Top {} Hacker News Stories:", max_stories);

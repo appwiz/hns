@@ -1,5 +1,5 @@
 use chrono::{TimeZone, Utc};
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use ego_tree::NodeRef;
 use reqwest;
 use scraper::node::Node;
@@ -11,13 +11,34 @@ use html2text::from_read;
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
+    #[clap(subcommand)]
+    command: Option<Commands>,
+
     /// Maximum number of stories to display (default: 5, max: 25)
     #[clap(short = 'm', long = "max-stories", default_value = "5", value_parser = clap::value_parser!(u8).range(1..=25))]
     max_stories: u8,
 
-    /// Enable URL summarization (placeholder)
-    #[clap(long = "summarize", action)]
+    /// Enable URL summarization (deprecated, use 'summarize' subcommand)
+    #[clap(long = "summarize", action, hide = true)]
     summarize: bool,
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    /// Show Hacker News stories (default)
+    Show {
+        /// Maximum number of stories to display (default: 5, max: 25)
+        #[clap(short = 'm', long = "max-stories", default_value = "5", value_parser = clap::value_parser!(u8).range(1..=25))]
+        max_stories: u8,
+    },
+    /// Show Hacker News stories with summaries
+    Summarize {
+        /// Maximum number of stories to display (default: 5, max: 25)
+        #[clap(short = 'm', long = "max-stories", default_value = "5", value_parser = clap::value_parser!(u8).range(1..=25))]
+        max_stories: u8,
+    },
+    /// Run diagnostic checks
+    Doctor,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)] // Added Clone
@@ -122,6 +143,90 @@ fn process_html_node(node_ref: NodeRef<'_, Node>, processed_text: &mut String) {
     }
 }
 
+async fn check_network_connectivity(urls: &[&str]) -> Result<(), Box<dyn std::error::Error>> {
+    println!("🔌 Checking network connectivity...");
+    
+    for url in urls {
+        print!("  Checking {}... ", url);
+        match reqwest::get(*url).await {
+            Ok(response) => {
+                if response.status().is_success() {
+                    println!("✅ OK");
+                } else {
+                    println!("⚠️  Status: {}", response.status());
+                }
+            }
+            Err(e) => {
+                println!("❌ Failed: {}", e);
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+async fn check_ollama_model(models: &[&str]) -> Result<(), Box<dyn std::error::Error>> {
+    println!("🤖 Checking Ollama models...");
+    
+    let client = reqwest::Client::new();
+    
+    for model in models {
+        print!("  Checking model '{}'... ", model);
+        
+        let payload = serde_json::json!({
+            "model": model,
+            "prompt": "test",
+            "stream": false,
+        });
+        
+        match client.post("http://localhost:11434/api/generate")
+            .json(&payload)
+            .send()
+            .await 
+        {
+            Ok(response) => {
+                if response.status().is_success() {
+                    println!("✅ Available");
+                } else {
+                    println!("❌ Status: {}", response.status());
+                }
+            }
+            Err(e) => {
+                println!("❌ Failed: {}", e);
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+async fn run_doctor() -> Result<(), Box<dyn std::error::Error>> {
+    println!("🩺 Running HNS Doctor Diagnostics");
+    println!("=====================================");
+    
+    // Network connectivity checks
+    let urls_to_check = [
+        "https://hacker-news.firebaseio.com/v0/topstories.json",
+        "http://localhost:11434/api/version",
+    ];
+    
+    check_network_connectivity(&urls_to_check).await?;
+    
+    println!();
+    
+    // Model checks
+    let models_to_check = [
+        "gemma3:4b",
+    ];
+    
+    check_ollama_model(&models_to_check).await?;
+    
+    println!();
+    println!("🎉 Diagnostics complete!");
+    
+    Ok(())
+}
+
 async fn summarize_url(url: &str) -> Result<String, Box<dyn std::error::Error>> {
     // Step 1: Fetch the webpage content
     print!("Fetching... ");
@@ -197,14 +302,36 @@ async fn summarize_url(url: &str) -> Result<String, Box<dyn std::error::Error>> 
 async fn main() -> Result<(), reqwest::Error> {
     let args = Args::parse();
 
-    println!("Top {} Hacker News Stories:", args.max_stories);
+    // Handle the doctor command separately
+    if let Some(Commands::Doctor) = args.command {
+        match run_doctor().await {
+            Ok(_) => return Ok(()),
+            Err(e) => {
+                eprintln!("Doctor diagnostics failed: {}", e);
+                std::process::exit(1);
+            }
+        }
+    }
+
+    // Determine max_stories and summarize flag based on command or global args
+    let (max_stories, summarize) = match args.command {
+        Some(Commands::Show { max_stories }) => (max_stories, false),
+        Some(Commands::Summarize { max_stories }) => (max_stories, true),
+        None => {
+            // Default behavior: use global args for backward compatibility
+            (args.max_stories, args.summarize)
+        },
+        Some(Commands::Doctor) => unreachable!(), // Already handled above
+    };
+
+    println!("Top {} Hacker News Stories:", max_stories);
 
     let top_story_ids = fetch_top_stories_ids().await?;
 
     let mut stories = Vec::new();
     let mut fetch_count = 0;
     for id in top_story_ids {
-        if fetch_count >= args.max_stories as usize {
+        if fetch_count >= max_stories as usize {
             // Limit to max stories specified by user
             break;
         }
@@ -245,7 +372,7 @@ async fn main() -> Result<(), reqwest::Error> {
         if is_show_hn {
             if let Some(url) = &story.url {
                 println!("URL: {}", url);
-                if args.summarize {
+                if summarize {
                     match summarize_url(url).await {
                         Ok(summary) => println!("Summary: {}", summary),
                         Err(e) => println!("Failed to generate summary: {}", e),
@@ -288,7 +415,7 @@ async fn main() -> Result<(), reqwest::Error> {
             // Only print URL if not a Show HN and no text
             if let Some(url) = &story.url {
                 println!("URL: {}", url);
-                if args.summarize {
+                if summarize {
                     match summarize_url(url).await {
                         Ok(summary) => println!("Summary: {}", summary),
                         Err(e) => println!("Failed to generate summary: {}", e),

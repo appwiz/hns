@@ -12,7 +12,7 @@ use html2text::from_read;
 #[clap(author, version, about, long_about = None)]
 struct Args {
     #[clap(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -33,7 +33,7 @@ enum Commands {
     Doctor,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)] // Added Clone
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct Story {
     id: u32,
     title: Option<String>,
@@ -232,7 +232,7 @@ async fn summarize_url(url: &str) -> Result<String, Box<dyn std::error::Error>> 
     
     // Step 2: Convert HTML to plain text (extract main content)
     print!("Processing... ");
-    let plain_text = from_read(html_content.as_bytes(), 10000); // 10000 chars width to avoid unwanted line breaks
+    let plain_text = from_read(html_content.as_bytes(), 10000);
     
     // Trim and limit the content length to avoid overwhelming the LLM
     let trimmed_text = plain_text.trim();
@@ -296,9 +296,9 @@ async fn main() -> Result<(), reqwest::Error> {
 
     // Determine max_stories and summarize flag based on command
     let (max_stories, summarize) = match args.command {
-        Commands::Show { max_stories } => (max_stories, false),
-        Commands::Summarize { max_stories } => (max_stories, true),
-        Commands::Doctor => {
+        Some(Commands::Show { max_stories }) => (max_stories, false),
+        Some(Commands::Summarize { max_stories }) => (max_stories, true),
+        Some(Commands::Doctor) => {
             match run_doctor().await {
                 Ok(_) => return Ok(()),
                 Err(e) => {
@@ -307,6 +307,7 @@ async fn main() -> Result<(), reqwest::Error> {
                 }
             }
         }
+        None => (5, true), // Default: summarize with 5 stories
     };
 
     println!("Top {} Hacker News Stories:", max_stories);

@@ -34,20 +34,28 @@ cargo install --path .
 
 ### Summarization Dependencies
 
-To use the `--summarize` feature, you need to have Ollama running with the gemma3:4b model installed:
+To use the summarization features, you need to have Ollama running with the gemma3:4b model installed:
 
 1. [Install Ollama](https://ollama.ai/) following the official instructions
 2. Pull the gemma3:4b model:
 ```bash
 ollama pull gemma3:4b
 ```
-3. Ensure Ollama is running before using the `--summarize` flag
+3. Ensure Ollama is running before using summarization
 ```bash
 # Start Ollama (keep running in a separate terminal)
 ollama serve
 ```
 
 ## Usage
+
+### Default Behavior
+
+When run without any subcommands, `hns` defaults to summarizing 5 stories:
+
+```bash
+hns                       # Same as 'hns summarize -m 5'
+```
 
 ### Subcommands
 

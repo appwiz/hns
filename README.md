@@ -15,7 +15,7 @@ A command-line interface for fetching and displaying top stories from Hacker New
 
 ## Example
 ```
-% hns --summarize
+% hns summarize
 ```
 ![displays how summarization works](hns-summarize.png)
 
@@ -49,10 +49,41 @@ ollama serve
 
 ## Usage
 
+### Default Behavior
+
 Run the tool with default settings (shows 5 top stories):
 
 ```bash
 hns
+```
+
+### Subcommands
+
+#### Show Stories (Default)
+
+Show Hacker News stories with customizable options:
+
+```bash
+hns show                 # Show 5 stories (default)
+hns show -m 10           # Show 10 stories
+hns show --max-stories 25  # Show maximum 25 stories
+```
+
+#### Summarize Stories
+
+Show Hacker News stories with AI-powered URL summaries:
+
+```bash
+hns summarize            # Show 5 stories with summaries
+hns summarize -m 10      # Show 10 stories with summaries
+```
+
+#### Doctor Diagnostics
+
+Run diagnostic checks to verify system setup:
+
+```bash
+hns doctor               # Check network connectivity and Ollama models
 ```
 
 ### Command-line Arguments
@@ -60,11 +91,20 @@ hns
 | Argument | Short | Description | Default | Range |
 |----------|-------|-------------|---------|-------|
 | `--max-stories` | `-m` | Maximum number of stories to display | 5 | 1-25 |
-| `--summarize` |  | Enable URL summarization using gemma3:4b model | false | - |
 | `--help` | `-h` | Display help information | - | - |
 | `--version` | `-V` | Display version information | - | - |
 
-#### Examples
+### Backward Compatibility
+
+For backward compatibility, the following legacy commands still work:
+
+```bash
+hns -m 10                # Same as: hns show -m 10
+hns --max-stories 25     # Same as: hns show --max-stories 25
+hns --summarize          # Same as: hns summarize (deprecated)
+```
+
+#### Legacy Examples
 
 Display the top 10 stories:
 
@@ -78,13 +118,13 @@ Display the maximum number of stories:
 hns --max-stories 25
 ```
 
-Display stories with URL summaries:
+Display stories with URL summaries (deprecated):
 
 ```bash
 hns --summarize
 ```
 
-Display 10 stories with URL summaries:
+Display 10 stories with URL summaries (deprecated):
 
 ```bash
 hns -m 10 --summarize
